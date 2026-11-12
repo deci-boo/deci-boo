@@ -47,20 +47,29 @@ button{font:inherit;cursor:pointer}
 #select h1{font-size:clamp(40px,8vw,84px);color:var(--amber);text-shadow:0 0 24px rgba(255,170,0,.45),4px 4px 0 #3b1d00;line-height:1}
 #select h1 small{display:block;font-size:.38em;color:var(--ink);letter-spacing:.3em;text-shadow:none;margin-top:6px}
 .lede{color:var(--mute);margin:14px 0 24px}
-.pick-cols{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;align-items:start}
+.pick-head{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;align-items:center;margin-bottom:14px}
 .vs{align-self:center;font:900 54px Impact,sans-serif;color:var(--amber);text-shadow:0 0 18px #ff9d00}
-.pick{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px}
-.pick h2{font-size:26px;margin:0 0 10px}
-.pick[data-p="0"] h2{color:var(--p1)} .pick[data-p="1"] h2{color:var(--p2)}
-.pick input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0c0e13;color:var(--ink);font-size:15px;margin-bottom:12px}
-.cards{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-.mcard{background:#0e1016;border:2px solid var(--line);border-radius:14px;padding:10px 8px 8px;color:var(--ink);transition:.15s}
+.pslot{background:var(--card);border:2px solid var(--line);border-radius:16px;padding:12px 14px;transition:.2s}
+.pslot h2{font-size:24px;margin:0 0 8px}
+.pslot[data-p="0"] h2{color:var(--p1)} .pslot[data-p="1"] h2{color:var(--p2)}
+.pslot[data-p="0"].turn{border-color:var(--p1);box-shadow:0 0 24px rgba(70,211,106,.3)}
+.pslot[data-p="1"].turn{border-color:var(--p2);box-shadow:0 0 24px rgba(255,90,77,.3)}
+.pslot b{display:block;font:900 20px Impact,sans-serif;letter-spacing:.06em;margin-top:8px;color:var(--mute)}
+.pslot input{width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:#0c0e13;color:var(--ink);font-size:15px}
+.pick-box{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px}
+.pick-prompt{font:900 26px Impact,"Arial Black",sans-serif;letter-spacing:.04em;margin-bottom:12px}
+.pick-box .ghost{margin-top:12px}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.mcard{position:relative;background:#0e1016;border:3px solid var(--line);border-radius:14px;padding:10px 8px 8px;color:var(--ink);transition:.15s}
 .mcard:hover:not(:disabled),.mcard:focus-visible{border-color:#5a6072;transform:translateY(-2px)}
+.mcard .badge{position:absolute;top:8px;left:8px;font:900 14px Impact,sans-serif;padding:2px 9px;border-radius:999px;color:#0b0b0b;display:none}
+.mcard.by0{border-color:var(--p1);box-shadow:0 0 0 3px rgba(70,211,106,.25),0 0 24px rgba(70,211,106,.3)}
+.mcard.by1{border-color:var(--p2);box-shadow:0 0 0 3px rgba(255,90,77,.25),0 0 24px rgba(255,90,77,.3)}
+.mcard.by0 .badge{display:block;background:var(--p1)}.mcard.by1 .badge{display:block;background:var(--p2)}
+.mcard.by0:disabled,.mcard.by1:disabled{opacity:1;cursor:default}
 .mcard .spr{width:78%;margin:6px auto 0}
 .mcard b{display:block;font:900 20px Impact,sans-serif;letter-spacing:.06em;margin-top:2px}
 .mcard span{display:block;font-size:12px;color:var(--mute);min-height:2.4em}
-.pick[data-p="0"] .mcard.sel{border-color:var(--p1);box-shadow:0 0 0 3px rgba(70,211,106,.25),0 0 24px rgba(70,211,106,.25)}
-.pick[data-p="1"] .mcard.sel{border-color:var(--p2);box-shadow:0 0 0 3px rgba(255,90,77,.25),0 0 24px rgba(255,90,77,.25)}
 .mcard:disabled{opacity:.3;cursor:not-allowed}
 .settings{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin:22px 0}
 .settings label{display:flex;gap:8px;align-items:center;color:var(--mute)}
@@ -203,8 +212,9 @@ code{background:#0b0c10;padding:1px 6px;border-radius:5px;font-size:13px}
   .controls{grid-template-columns:1fr}
 }
 @media (max-width:720px){
-  .pick-cols{grid-template-columns:1fr}
-  .vs{font-size:36px}
+  .pick-head{grid-template-columns:1fr auto 1fr;gap:8px}
+  .cards{grid-template-columns:repeat(2,1fr)}
+  .vs{font-size:28px}
   .arena{grid-template-columns:1fr 1fr;grid-template-areas:"b b" "s1 s2"}
   .arena .board{grid-area:b}.arena .side[data-p="0"]{grid-area:s1}.arena .side[data-p="1"]{grid-area:s2}
   .side .spr{max-width:120px;margin:0 auto}
@@ -216,19 +226,16 @@ code{background:#0b0c10;padding:1px 6px;border-radius:5px;font-size:13px}
 <!-- ======================= SELECT ======================= -->
 <section id="select">
   <h1 class="title">DECI-BOO!<small>ROAR GAMES</small></h1>
-  <p class="lede">เลือกมอนสเตอร์ของแต่ละฝั่ง แล้วมาดูกันว่าใครคำรามได้ดังและนานกว่า</p>
-  <div class="pick-cols">
-    <div class="pick" data-p="0">
-      <h2 class="title">PLAYER 1</h2>
-      <input id="pn0" maxlength="14" placeholder="ชื่อผู้เล่น 1">
-      <div class="cards" id="cards0"></div>
-    </div>
+  <p class="lede">มาดูกันว่าใครคำรามได้ดังและนานกว่า</p>
+  <div class="pick-head">
+    <div class="pslot" data-p="0"><h2 class="title">PLAYER 1</h2><input id="pn0" maxlength="14" placeholder="ชื่อผู้เล่น 1"><b id="pick0">ยังไม่เลือก</b></div>
     <div class="vs">VS</div>
-    <div class="pick" data-p="1">
-      <h2 class="title">PLAYER 2</h2>
-      <input id="pn1" maxlength="14" placeholder="ชื่อผู้เล่น 2">
-      <div class="cards" id="cards1"></div>
-    </div>
+    <div class="pslot" data-p="1"><h2 class="title">PLAYER 2</h2><input id="pn1" maxlength="14" placeholder="ชื่อผู้เล่น 2"><b id="pick1">ยังไม่เลือก</b></div>
+  </div>
+  <div class="pick-box">
+    <div class="pick-prompt" id="pickPrompt"></div>
+    <div class="cards" id="cards"></div>
+    <button class="ghost" id="repick">เลือกใหม่</button>
   </div>
   <div class="settings">
     <label>จำนวนรอบต่อคน
@@ -289,8 +296,7 @@ code{background:#0b0c10;padding:1px 6px;border-radius:5px;font-size:13px}
       <div class="mrow"><span>amp <b id="ampv">0</b></span><span>peak ตานี้ <b id="pkv">–</b></span><span>เกินเกณฑ์ <b id="holdv">–</b></span></div>
       <div class="go-row">
         <button class="big-btn" id="go">เริ่มตานี้</button>
-        <button class="simbtn hidden" id="simRoar">กดค้าง = คำราม</button>
-        <button class="ghost hidden" id="micBtn">ใช้ไมค์คอม</button>
+        <button class="simbtn hidden" id="simRoar">กดค้าง = จำลองเสียง</button>
       </div>
       <div class="hint" id="goHint">หรือกดปุ่มบน KY-040</div>
     </div>
@@ -434,7 +440,7 @@ const $ = s => document.querySelector(s);
 const MIN_HOLD = 200, ROW_MAX = 500, TH_MIN = 100, TH_MAX = 4000;
 const S = {
   esp: false, online: false, forceSim: /[?&]sim=1/.test(location.search),
-  amp: 0, players: [{ m: 'gobbo', name: '' }, { m: 'bruto', name: '' }],
+  amp: 0, players: [{ m: null, name: '' }, { m: null, name: '' }],
   rounds: 3, roarMs: 3000, turn: 0, scores: [[], []], phase: 'select',
   th: 2000, thHoldUntil: 0, btnSeq: null, roarSeq: null,
   roar: null, timers: [], simHeld: false, simAmp: 12, mic: null,
@@ -472,40 +478,27 @@ async function poll() {
 }
 function setOnline(v) {
   const was = S.online; S.online = v && !S.forceSim;
-  const c = $('#conn');
-  c.textContent = S.online ? 'STM32 Online' : (S.esp ? 'รอ STM32… (โหมดจำลอง)' : 'โหมดจำลอง');
+  const c = $('#conn'), sim = S.forceSim;
+  c.textContent = S.online ? 'STM32 Online' : sim ? 'โหมดจำลอง (?sim=1)' : (S.esp ? 'รอ STM32… (เช็คสาย UART/GND)' : 'ไม่เจอ ESP32');
   c.className = 'pill ' + (S.online ? 'ok' : 'sim');
-  $('#selConn').textContent = S.online ? 'เชื่อมต่อบอร์ดแล้ว ✓' : 'ยังไม่เจอบอร์ด — เล่นโหมดจำลองได้ (กด SPACE ค้าง = คำราม, Enter = ปุ่ม KY-040)';
-  $('#simRoar').classList.toggle('hidden', S.online);
-  $('#micBtn').classList.toggle('hidden', S.online || !navigator.mediaDevices);
-  $('#goHint').textContent = S.online ? 'หรือกดปุ่มบน KY-040' : 'Enter = ปุ่ม KY-040 · SPACE ค้าง = คำราม';
+  $('#selConn').textContent = S.online ? 'เชื่อมต่อบอร์ดแล้ว ✓ ใช้เสียงจาก KY-037'
+    : sim ? 'โหมดจำลองสำหรับนักพัฒนา: SPACE ค้าง = ค่าสุ่มแทนเสียง, Enter = ปุ่ม KY-040'
+    : 'รอเชื่อมต่อ STM32… ต้องต่อบอร์ดก่อนถึงจะเริ่มเกมได้';
+  $('#simRoar').classList.toggle('hidden', !sim);
+  $('#goHint').textContent = S.online ? 'หรือกดปุ่มบน KY-040 · คำรามใส่ไมค์ KY-037'
+    : sim ? 'Enter = ปุ่ม KY-040 · SPACE ค้าง = ค่าสุ่มแทนเสียง' : 'บอร์ดหลุด — รอ STM32 กลับมา';
+  if (S.phase === 'ready') $('#go').disabled = !(S.online || sim);
+  if (S.phase === 'select') refreshSelect();
   if (S.online && !was && S.phase !== 'select') { sendCmd('GAME,1'); pushTh(); syncLed(); }
 }
 
-/* simulation: keyboard / button / laptop mic */
-setInterval(() => {
-  if (S.online) return;
-  let a;
-  if (S.mic) {
-    S.mic.an.getByteTimeDomainData(S.mic.buf);
-    let lo = 255, hi = 0; for (const v of S.mic.buf) { if (v < lo) lo = v; if (v > hi) hi = v; }
-    a = Math.min(4095, (hi - lo) * 16);
-  } else {
-    const target = S.simHeld ? 2300 + Math.random() * 1700 : 10 + Math.random() * 14;
-    S.simAmp += (target - S.simAmp) * (S.simHeld ? .35 : .45);
-    a = Math.round(S.simAmp);
-  }
-  onSample(a);
+/* Dev-only simulation (open with ?sim=1): random fake amplitude while SPACE is held.
+   Normal play uses ONLY the KY-037 amplitude streamed by the STM32. */
+if (S.forceSim) setInterval(() => {
+  const target = S.simHeld ? 2300 + Math.random() * 1700 : 10 + Math.random() * 14;
+  S.simAmp += (target - S.simAmp) * (S.simHeld ? .35 : .45);
+  onSample(Math.round(S.simAmp));
 }, 50);
-async function enableMic() {
-  try {
-    const st = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
-    const ac = new AudioContext(), an = ac.createAnalyser(); an.fftSize = 1024;
-    ac.createMediaStreamSource(st).connect(an);
-    S.mic = { an, buf: new Uint8Array(an.fftSize) };
-    $('#micBtn').textContent = 'ไมค์คอม ✓';
-  } catch (e) { alert('เปิดไมค์ไม่ได้ — ต้องเปิดหน้าเว็บผ่าน localhost หรือ https'); }
-}
 
 /* =========================================================
    Live samples
@@ -619,7 +612,7 @@ function showLast(sc, who, src) {
 function enterReady() {
   S.phase = 'ready'; S.roar = null;
   lamps('Y'); sendCmd('LED,Y'); lockTh(false);
-  $('#go').disabled = false; $('#mpk').style.opacity = 0; $('#pkv').textContent = '–'; $('#holdv').textContent = '–';
+  $('#go').disabled = !(S.online || S.forceSim); $('#mpk').style.opacity = 0; $('#pkv').textContent = '–'; $('#holdv').textContent = '–';
   [0, 1].forEach(i => pose($('#spr' + i), 'idle'));
   hideBig(); $('#go').textContent = `เริ่มตา ${pname(cur())}`;
   render();
@@ -703,27 +696,44 @@ function newGame() {
 /* =========================================================
    Select screen
    ========================================================= */
+/* One shared grid: Player 1 picks first, then Player 2. A picked monster gets that
+   player's colour frame and can't be picked again. */
 function buildSelect() {
-  for (const p of [0, 1]) {
-    const box = $('#cards' + p);
-    box.innerHTML = MONS.map(m => `<button class="mcard" data-m="${m.id}"><div class="spr"></div><b style="color:${m.color}">${m.name}</b><span>${m.tag}</span></button>`).join('');
-    box.querySelectorAll('.mcard').forEach(b => {
-      sprite(b.querySelector('.spr'), b.dataset.m);
-      b.addEventListener('click', () => { S.players[p].m = b.dataset.m; refreshSelect(); pose(b.querySelector('.spr'), 'roar'); setTimeout(() => pose(b.querySelector('.spr'), 'idle'), 900); });
-      b.addEventListener('mouseenter', () => pose(b.querySelector('.spr'), 'roar'));
-      b.addEventListener('mouseleave', () => pose(b.querySelector('.spr'), 'idle'));
+  const box = $('#cards');
+  box.innerHTML = MONS.map(m => `<button class="mcard" data-m="${m.id}"><i class="badge"></i><div class="spr"></div><b style="color:${m.color}">${m.name}</b><span>${m.tag}</span></button>`).join('');
+  box.querySelectorAll('.mcard').forEach(b => {
+    const spr = b.querySelector('.spr');
+    sprite(spr, b.dataset.m);
+    b.addEventListener('click', () => {
+      const p = S.players[0].m ? (S.players[1].m ? -1 : 1) : 0;
+      if (p < 0 || S.players.some(x => x.m === b.dataset.m)) return;
+      S.players[p].m = b.dataset.m; refreshSelect();
+      pose(spr, 'roar'); setTimeout(() => pose(spr, 'idle'), 900);
     });
-  }
+    b.addEventListener('mouseenter', () => { if (!b.disabled) pose(spr, 'roar'); });
+    b.addEventListener('mouseleave', () => pose(spr, 'idle'));
+  });
+  $('#repick').addEventListener('click', () => { S.players[0].m = S.players[1].m = null; refreshSelect(); });
   refreshSelect();
 }
 function refreshSelect() {
+  const turn = S.players[0].m ? (S.players[1].m ? -1 : 1) : 0;
+  $('#cards').querySelectorAll('.mcard').forEach(b => {
+    const by = S.players.findIndex(x => x.m === b.dataset.m);
+    b.classList.toggle('by0', by === 0); b.classList.toggle('by1', by === 1);
+    b.querySelector('.badge').textContent = by >= 0 ? 'P' + (by + 1) : '';
+    b.disabled = by >= 0 || turn < 0;
+  });
   for (const p of [0, 1]) {
-    $('#cards' + p).querySelectorAll('.mcard').forEach(b => {
-      b.classList.toggle('sel', S.players[p].m === b.dataset.m);
-      b.disabled = S.players[1 - p].m === b.dataset.m;
-    });
+    document.querySelector(`.pslot[data-p="${p}"]`).classList.toggle('turn', turn === p);
+    const m = S.players[p].m, el = $('#pick' + p);
+    el.textContent = m ? mon(m).name : 'ยังไม่เลือก'; el.style.color = m ? mon(m).color : '';
   }
-  $('#startGame').disabled = !(S.players[0].m && S.players[1].m && S.players[0].m !== S.players[1].m);
+  const pp = $('#pickPrompt');
+  pp.textContent = turn < 0 ? 'พร้อมแล้ว! กดเริ่มเกม' : `PLAYER ${turn + 1} เลือกตัวละคร`;
+  pp.style.color = turn === 0 ? 'var(--p1)' : turn === 1 ? 'var(--p2)' : 'var(--amber)';
+  $('#repick').classList.toggle('hidden', !S.players[0].m);
+  $('#startGame').disabled = !(turn < 0 && (S.online || S.forceSim));
 }
 $('#startGame').addEventListener('click', () => {
   S.players[0].name = $('#pn0').value.trim(); S.players[1].name = $('#pn1').value.trim();
@@ -739,14 +749,14 @@ $('#quit').addEventListener('click', toSelect);
 $('#reselect').addEventListener('click', toSelect);
 $('#again').addEventListener('click', newGame);
 $('#go').addEventListener('click', startTurn);
-$('#micBtn').addEventListener('click', enableMic);
 const sim = $('#simRoar');
 sim.addEventListener('pointerdown', e => { S.simHeld = true; sim.classList.add('held'); sim.setPointerCapture(e.pointerId); });
 ['pointerup', 'pointercancel'].forEach(ev => sim.addEventListener(ev, () => { S.simHeld = false; sim.classList.remove('held'); }));
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' && e.target.type !== 'range') return;
-  if (e.code === 'Space' && S.phase !== 'select') { e.preventDefault(); S.simHeld = true; }
-  if (e.code === 'Enter' && !S.online && S.phase !== 'select') { e.preventDefault(); onHwButton(); }
+  if (!S.forceSim || S.phase === 'select') return;
+  if (e.code === 'Space') { e.preventDefault(); S.simHeld = true; }
+  if (e.code === 'Enter') { e.preventDefault(); onHwButton(); }
 });
 addEventListener('keyup', e => { if (e.code === 'Space') S.simHeld = false; });
 

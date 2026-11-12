@@ -35,13 +35,14 @@
 
 Open `http://<ESP32-IP>/` (the old dashboard moved to `/dash`).
 
-1. Each player picks a monster → set threshold (web slider or rotate `KY-040`).
+1. Player 1 picks, then Player 2 (one shared grid, no duplicates) → set threshold (web slider or rotate `KY-040`).
 2. Press **Start turn** (or push `KY-040`): yellow light fades over 3 s → **ROAR!** window (2–4 s).
 3. STM32 measures peak + time above threshold → green (pass) / red (fail) on the web and on `KY-009`.
 4. Score = `th/10` + `(peak−th)/20` + `time-above-threshold ratio × 100`. Pass needs peak ≥ th and ≥ 0.2 s above it. Higher center bar wins.
 
 - Source: [`web/game.html`](web/game.html) → after editing run `python3 tools/embed_html.py` to regenerate `game_html.h` for the ESP32.
-- Without a board (open the file directly) it runs in simulation mode: hold `SPACE` to roar, `Enter` = KY-040 button.
+- Gameplay uses only the real `KY-037` amplitude from the STM32; Start stays locked until the board is online.
+- Dev-only simulation: open with `?sim=1` (hold `SPACE` = random fake amplitude, `Enter` = KY-040 button).
 
 UART protocol additions (`\n`-terminated):
 
