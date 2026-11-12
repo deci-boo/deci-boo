@@ -1,6 +1,7 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include "secrets.h"
+#include "game_html.h"   // generated from web/game.html (python3 tools/embed_html.py)
 
 // ====== UART กับ STM32 ======
 #define STM_RX_PIN 18
@@ -16,9 +17,16 @@ int latestWarn  = 200;
 int latestAlert = 400;
 int latestState = 0; // 0=QUIET, 1=WARN, 2=ALERT
 unsigned long lastStmMs = 0;
+
+// ====== Roar Games state (from STM32) ======
+int roarSeq  = 0;   // increments on every "RES,<peak>,<hold_ms>,<pass>"
+int roarPeak = 0;
+int roarHold = 0;
+int roarPass = 0;
+int btnSeq   = 0;   // increments on every "BTN" (KY-040 push in game mode)
 unsigned long lastWifiCheckMs = 0;
 
-static const char INDEX_HTML[] = R"rawliteral(
+static const char DASH_HTML[] = R"rawliteral(
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -130,15 +138,21 @@ poll();
 )rawliteral";
 
 void handleRoot() {
-  server.send(200, "text/html", INDEX_HTML);
+  server.send_P(200, "text/html; charset=utf-8", GAME_HTML);
+}
+
+void handleDash() {
+  server.send(200, "text/html; charset=utf-8", DASH_HTML);
 }
 
 void handleStatus() {
   bool online = (lastStmMs > 0) && ((millis() - lastStmMs) < 3000UL);
-  char json[160];
+  char json[256];
   snprintf(json, sizeof(json),
-           "{\"online\":%s,\"amp\":%d,\"warn\":%d,\"alert\":%d,\"state\":%d}",
-           online ? "true" : "false", latestAmp, latestWarn, latestAlert, latestState);
+           "{\"online\":%s,\"amp\":%d,\"warn\":%d,\"alert\":%d,\"state\":%d,"
+           "\"roarSeq\":%d,\"roarPeak\":%d,\"roarHold\":%d,\"roarPass\":%d,\"btnSeq\":%d}",
+           online ? "true" : "false", latestAmp, latestWarn, latestAlert, latestState,
+           roarSeq, roarPeak, roarHold, roarPass, btnSeq);
   server.send(200, "application/json", json);
 }
 
@@ -149,7 +163,7 @@ void handleSet() {
   }
   int th = server.arg("th").toInt();
   if (th < 100) th = 100;
-  if (th > 3000) th = 3000;
+  if (th > 4000) th = 4000;
 
   Serial1.print("SET_TH,");
   Serial1.print(th);
@@ -159,6 +173,31 @@ void handleSet() {
   char resp[64];
   snprintf(resp, sizeof(resp), "{\"ok\":true,\"alert\":%d}", th);
   server.send(200, "application/json", resp);
+}
+
+// Generic game command relay: /api/cmd?c=LED,Y  -> "LED,Y\n" to STM32
+// Only whitelisted commands made of [A-Z0-9,_] are forwarded.
+bool isAllowedCmd(const String &c) {
+  if (c.length() == 0 || c.length() > 32) return false;
+  for (size_t i = 0; i < c.length(); i++) {
+    char ch = c[i];
+    if (!((ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == ',' || ch == '_')) return false;
+  }
+  return c.startsWith("SET_TH,") || c.startsWith("GAME,") || c.startsWith("LED,") ||
+         c.startsWith("ROAR,") || c == "ROAR_STOP" || c == "PING";
+}
+
+void handleCmd() {
+  String c = server.hasArg("c") ? server.arg("c") : "";
+  c.trim();
+  if (!isAllowedCmd(c)) {
+    server.send(400, "application/json", "{\"ok\":false}");
+    return;
+  }
+  Serial1.print(c);
+  Serial1.print('\n');
+  Serial.printf("[WEB -> STM32] %s\n", c.c_str());
+  server.send(200, "application/json", "{\"ok\":true}");
 }
 
 void connectWiFi() {
@@ -189,7 +228,9 @@ void setup() {
 
   server.on("/", handleRoot);
   server.on("/api/status", handleStatus);
+  server.on("/dash", handleDash);
   server.on("/api/set", handleSet);
+  server.on("/api/cmd", handleCmd);
   server.begin();
   Serial.println("WebServer started on port 80");
 }
@@ -212,6 +253,16 @@ void loop() {
             latestState = state;
             lastStmMs   = millis();
           }
+        } else if (stmLine.startsWith("RES,")) {
+          int peak, hold, pass;
+          if (sscanf(stmLine.c_str(), "RES,%d,%d,%d", &peak, &hold, &pass) == 3) {
+            roarPeak = peak;
+            roarHold = hold;
+            roarPass = pass;
+            roarSeq++;
+          }
+        } else if (stmLine == "BTN") {
+          btnSeq++;
         }
       }
       stmLine = "";

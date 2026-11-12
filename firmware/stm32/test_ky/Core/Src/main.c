@@ -45,7 +45,14 @@
 #define WARN_HOLD_MS         600U    /* ค้างสถานะเริ่มดังกันไฟกระพริบถี่ */
 #define DEFAULT_ALERT_TH     400     /* เกณฑ์เสียงดังเกินกำหนดเริ่มต้น (0-4095) */
 #define MIN_ALERT_TH         100
-#define MAX_ALERT_TH         3000
+#define MAX_ALERT_TH         4000
+/* ---- Roar Games (web game mode) ---- */
+#define GAME_MIN_HOLD_MS     200U    /* ต้องดังเกินเกณฑ์รวม >= 0.2 s ถึงผ่าน (กันตบมือ) */
+#define GAME_FADE_MS         3000U   /* ไฟเหลืองค่อยๆ ดับก่อนเริ่มคำราม */
+#define GAME_MIN_ROAR_MS     500
+#define GAME_MAX_ROAR_MS     10000
+#define STAT_PERIOD_FOCUS_MS 500U
+#define STAT_PERIOD_GAME_MS  100U    /* ส่ง STAT ถี่ขึ้นตอนเล่นเกม ให้เกจบนเว็บลื่น */
 #define ENC_STEP_TH          25      /* หมุน KY-040 1 กิ๊ก ปรับเกณฑ์ทีละ 25 */
 /* ตั้งเป็น 1 ถ้าปรับ pot สีฟ้าบน KY-037 แล้วและอยากให้ D0=0 ทริกเกอร์แดงด้วย */
 #define USE_MIC_D0_TRIGGER   0
@@ -91,6 +98,14 @@ typedef enum {
   FOCUS_WARN,
   FOCUS_ALERT
 } FocusState_t;
+typedef enum {
+  GLED_OFF = 0,
+  GLED_YELLOW,       /* LED,Y   : พร้อมเล่น / เปลี่ยนตา */
+  GLED_YELLOW_FADE,  /* LED,F   : เหลืองค่อยๆ ดับใน 3 s (นับถอยหลัง) */
+  GLED_GREEN,        /* LED,G   : ผ่านเกณฑ์ */
+  GLED_RED,          /* LED,R   : ไม่ผ่าน (กระพริบ) */
+  GLED_LISTEN        /* ระหว่าง ROAR: น้ำเงินหรี่ / เขียวเมื่อดังเกินเกณฑ์ */
+} GameLed_t;
 static void RGB_Set(uint16_t r, uint16_t g, uint16_t b)
 {
   if (r > PWM_MAX) r = PWM_MAX;
@@ -175,6 +190,15 @@ int main(void)
     FocusState_t prev_state = FOCUS_QUIET;
     HAL_UART_Receive_IT(&huart1, &u1_rx_byte, 1);
       uint32_t last_esp_tx_ms = 0;
+    /* Roar Games */
+    uint8_t   game_mode = 0;          /* 0 = Focus monitor, 1 = Web game */
+    GameLed_t game_led = GLED_OFF;
+    uint32_t  game_led_t0 = 0;
+    uint8_t   roar_active = 0;
+    uint32_t  roar_end_ms = 0;
+    int32_t   roar_th = 0;
+    uint16_t  roar_peak = 0;
+    uint32_t  roar_hold_ms = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -204,6 +228,15 @@ int main(void)
 	      if (prev_sw == GPIO_PIN_SET && curr_sw == GPIO_PIN_RESET && (now - last_sw_ms) > 200U)
 	      {
 	        last_sw_ms = now;
+	        if (game_mode)
+	        {
+	          /* โหมดเกม: ปุ่มใช้ "เริ่มตานี้" -> แจ้งเว็บผ่าน ESP32 */
+	          const char *btn = "BTN\n";
+	          HAL_UART_Transmit(&huart1, (uint8_t *)btn, (uint16_t)strlen(btn), 50);
+	          { const char *bl = "[KY-040 SW] BTN -> web\r\n"; HAL_UART_Transmit(&huart2, (uint8_t *)bl, (uint16_t)strlen(bl), 100); }
+	        }
+	        else
+	        {
 	        alert_threshold = DEFAULT_ALERT_TH;
 	        warn_threshold = alert_threshold / 2;
 	        /* กระพริบสีน้ำเงินสั้นๆ ยืนยันการกดปุ่ม */
@@ -213,6 +246,7 @@ int main(void)
 	        int n = snprintf(reset_msg, sizeof(reset_msg),
 	                         "[KY-040 SW] Reset alert_th -> %ld\r\n", (long)alert_threshold);
 	        HAL_UART_Transmit(&huart2, (uint8_t *)reset_msg, (uint16_t)n, 100);
+	        }
 	      }
 	      prev_sw = curr_sw;
 	      /* 3. อ่าน KY-037: A0 (Peak-to-Peak 50 ms) และ D0 (PA1) */
@@ -244,7 +278,58 @@ int main(void)
 	      {
 	        state = FOCUS_QUIET;
 	      }
-	      /* 5. ขับสี KY-009 RGB LED */
+	      /* 4b. Roar Games: เก็บ peak / เวลาที่ดังเกินเกณฑ์ ระหว่างช่วงคำราม */
+	      if (roar_active)
+	      {
+	        if (amp > roar_peak) roar_peak = amp;
+	        if (amp >= (uint16_t)roar_th) roar_hold_ms += MIC_SAMPLE_WINDOW_MS;
+	        if ((int32_t)(now - roar_end_ms) >= 0)
+	        {
+	          roar_active = 0;
+	          uint8_t pass = (roar_peak >= (uint16_t)roar_th) && (roar_hold_ms >= GAME_MIN_HOLD_MS);
+	          game_led = pass ? GLED_GREEN : GLED_RED;
+	          game_led_t0 = now;
+	          char res[48];
+	          int rlen = snprintf(res, sizeof(res), "RES,%u,%lu,%u\n",
+	                              roar_peak, (unsigned long)roar_hold_ms, pass);
+	          HAL_UART_Transmit(&huart1, (uint8_t *)res, (uint16_t)rlen, 50);
+	          HAL_UART_Transmit(&huart2, (uint8_t *)res, (uint16_t)rlen, 50);
+	        }
+	      }
+	      /* 5. ขับสี KY-009 RGB LED (โหมดเกม: เว็บเป็นคนสั่งสีไฟ) */
+	      if (game_mode)
+	      {
+	        uint32_t el = now - game_led_t0;
+	        switch (game_led)
+	        {
+	          case GLED_YELLOW:
+	            RGB_Set(YELLOW_R_DUTY, YELLOW_G_DUTY, 0);
+	            break;
+	          case GLED_YELLOW_FADE:
+	            if (el >= GAME_FADE_MS) RGB_Set(0, 0, 0);
+	            else
+	            {
+	              uint32_t k = GAME_FADE_MS - el;
+	              RGB_Set((uint16_t)(YELLOW_R_DUTY * k / GAME_FADE_MS),
+	                      (uint16_t)(YELLOW_G_DUTY * k / GAME_FADE_MS), 0);
+	            }
+	            break;
+	          case GLED_GREEN:
+	            RGB_Set(0, PWM_MAX, 0);
+	            break;
+	          case GLED_RED:
+	            RGB_Set(((el / ALERT_BLINK_MS) % 2U) == 0U ? PWM_MAX : 0, 0, 0);
+	            break;
+	          case GLED_LISTEN:
+	            if (amp >= (uint16_t)roar_th) RGB_Set(0, PWM_MAX, 0);
+	            else RGB_Set(0, 0, 250);
+	            break;
+	          default:
+	            RGB_Set(0, 0, 0);
+	            break;
+	        }
+	      }
+	      else
 	      switch (state)
 	      {
 	        case FOCUS_QUIET:
@@ -302,10 +387,58 @@ int main(void)
 	              int alen = snprintf(ack, sizeof(ack), "ACK,SET_TH,%ld\n", (long)alert_threshold);
 	              HAL_UART_Transmit(&huart1, (uint8_t *)ack, (uint16_t)alen, 50);
 	            }
+	            else if (strncmp(u1_rx_buf, "GAME,", 5) == 0)
+	            {
+	              /* GAME,1 = เข้าโหมดเกม, GAME,0 = กลับโหมด Focus */
+	              game_mode = (atoi(&u1_rx_buf[5]) != 0);
+	              game_led = GLED_OFF;
+	              game_led_t0 = now;
+	              roar_active = 0;
+	              char ack[24];
+	              int alen = snprintf(ack, sizeof(ack), "ACK,GAME,%u\n", game_mode);
+	              HAL_UART_Transmit(&huart1, (uint8_t *)ack, (uint16_t)alen, 50);
+	            }
+	            else if (strncmp(u1_rx_buf, "LED,", 4) == 0)
+	            {
+	              const char *m = &u1_rx_buf[4];
+	              game_led = (strcmp(m, "Y") == 0) ? GLED_YELLOW :
+	                         (strcmp(m, "F") == 0) ? GLED_YELLOW_FADE :
+	                         (strcmp(m, "G") == 0) ? GLED_GREEN :
+	                         (strcmp(m, "R") == 0) ? GLED_RED : GLED_OFF;
+	              game_led_t0 = now;
+	              game_mode = 1;
+	            }
+	            else if (strncmp(u1_rx_buf, "ROAR,", 5) == 0)
+	            {
+	              /* ROAR,<threshold>,<window_ms> -> เริ่มจับเสียงคำราม แล้วตอบ RES,<peak>,<hold_ms>,<pass> */
+	              char *endp = NULL;
+	              int32_t th = strtol(&u1_rx_buf[5], &endp, 10);
+	              int32_t ms = (endp && *endp == ',') ? strtol(endp + 1, NULL, 10) : 3000;
+	              if (th < MIN_ALERT_TH) th = MIN_ALERT_TH;
+	              if (th > MAX_ALERT_TH) th = MAX_ALERT_TH;
+	              if (ms < GAME_MIN_ROAR_MS) ms = GAME_MIN_ROAR_MS;
+	              if (ms > GAME_MAX_ROAR_MS) ms = GAME_MAX_ROAR_MS;
+	              game_mode = 1;
+	              roar_th = th;
+	              roar_peak = 0;
+	              roar_hold_ms = 0;
+	              roar_end_ms = now + (uint32_t)ms;
+	              roar_active = 1;
+	              game_led = GLED_LISTEN;
+	              game_led_t0 = now;
+	              char ack[40];
+	              int alen = snprintf(ack, sizeof(ack), "ACK,ROAR,%ld,%ld\n", (long)th, (long)ms);
+	              HAL_UART_Transmit(&huart1, (uint8_t *)ack, (uint16_t)alen, 50);
+	            }
+	            else if (strcmp(u1_rx_buf, "ROAR_STOP") == 0)
+	            {
+	              roar_active = 0;
+	              game_led = GLED_OFF;
+	            }
 	            u1_cmd_ready = 0;
 	          }
 	          /* 8. ส่งสถานะ Focus Mode ไป ESP32-S3 ทุก 500 ms */
-	          if ((now - last_esp_tx_ms) >= 500U)
+	          if ((now - last_esp_tx_ms) >= (game_mode ? STAT_PERIOD_GAME_MS : STAT_PERIOD_FOCUS_MS))
 	          {
 	            last_esp_tx_ms = now;
 	            char esp_buf[64];
